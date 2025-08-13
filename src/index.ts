@@ -7,6 +7,7 @@ import {
   type WebSearchRequest,
   type IngestUpstreamRequest
 } from './schemas.js';
+import { searchBrave } from './services/web.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
@@ -65,15 +66,18 @@ fastify.post<{ Body: WebSearchRequest }>('/search/web', async (request, reply) =
   try {
     const { query, max_results = 10 } = request.body;
     
+    // Use Brave search with caching
+    const braveResults = await searchBrave(query, max_results);
+    
     return {
       query,
-      total_results: 1500,
-      results: Array.from({ length: Math.min(max_results, 3) }, (_, i) => ({
-        title: `Search Result ${i + 1} for "${query}"`,
-        url: `https://example.com/result-${i + 1}`,
-        snippet: `This is a sample snippet for search result ${i + 1} related to ${query}...`,
-        domain: 'example.com',
-        published_date: new Date().toISOString()
+      total_results: braveResults.length,
+      results: braveResults.map(result => ({
+        title: result.title,
+        url: result.url,
+        snippet: result.snippet,
+        domain: new URL(result.url).hostname,
+        published_date: new Date().toISOString() // Brave doesn't provide publish date
       }))
     };
   } catch (error) {

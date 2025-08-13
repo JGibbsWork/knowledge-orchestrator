@@ -12,7 +12,11 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["fastify", "typescript", "service"],
+  "keywords": [
+    "fastify",
+    "typescript",
+    "service"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -24,9 +28,11 @@
     "jsdom": "^23.0.1",
     "mongodb": "^6.3.0",
     "node-fetch": "^3.3.2",
+    "openai": "^5.12.2",
     "pino": "^8.16.2",
     "pino-pretty": "^10.2.3",
     "playwright": "^1.40.0",
+    "tiktoken": "^1.0.22",
     "zod": "^3.22.4"
   },
   "devDependencies": {

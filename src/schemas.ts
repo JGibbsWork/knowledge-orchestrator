@@ -108,73 +108,61 @@ export const WebSearchResponseSchema = z.object({
 });
 
 export const IngestUpstreamRequestSchema = z.object({
-  source_url: z.string().url().openapi({
-    description: 'URL of the upstream source to ingest',
-    example: 'https://api.example.com/data'
+  source: z.enum(['memory', 'notion']).openapi({
+    description: 'Source system to ingest from',
+    example: 'memory'
   }),
-  auth: z.object({
-    type: z.enum(['none', 'bearer', 'basic', 'api_key']).openapi({
-      description: 'Authentication type',
-      example: 'bearer'
-    }),
-    token: z.string().optional().openapi({
-      description: 'Authentication token (for bearer/api_key)',
-      example: 'abc123def456'
-    }),
-    username: z.string().optional().openapi({
-      description: 'Username (for basic auth)',
-      example: 'user'
-    }),
-    password: z.string().optional().openapi({
-      description: 'Password (for basic auth)',
-      example: 'password'
-    })
-  }).optional().openapi({
-    description: 'Authentication configuration'
+  id: z.string().min(1).openapi({
+    description: 'Document ID in the source system',
+    example: 'doc_123456'
   }),
-  transform: z.object({
-    format: z.enum(['json', 'xml', 'csv', 'text']).optional().openapi({
-      description: 'Expected format of source data',
-      example: 'json'
-    }),
-    mapping: z.record(z.string()).optional().openapi({
-      description: 'Field mapping configuration',
-      example: { 'source_field': 'target_field' }
-    })
-  }).optional().openapi({
-    description: 'Data transformation configuration'
+  scope: z.string().optional().openapi({
+    description: 'Optional scope for organizing chunks',
+    example: 'project_alpha'
   })
 }).openapi({
-  description: 'Request schema for upstream ingestion'
+  description: 'Request schema for upstream document ingestion'
 });
 
 export const IngestUpstreamResponseSchema = z.object({
-  job_id: z.string().openapi({
-    description: 'Unique identifier for the ingestion job',
-    example: 'ingest_789123'
+  source: z.enum(['memory', 'notion']).openapi({
+    description: 'Source system that was ingested from',
+    example: 'memory'
   }),
-  status: z.enum(['pending', 'in_progress', 'completed', 'failed']).openapi({
-    description: 'Status of the ingestion job',
-    example: 'in_progress'
+  id: z.string().openapi({
+    description: 'Document ID that was ingested',
+    example: 'doc_123456'
   }),
-  source_url: z.string().url().openapi({
-    description: 'URL of the ingested source',
-    example: 'https://api.example.com/data'
+  status: z.enum(['success', 'no_change', 'error']).openapi({
+    description: 'Status of the ingestion operation',
+    example: 'success'
   }),
-  records_processed: z.number().openapi({
-    description: 'Number of records processed',
-    example: 1250
+  chunks_created: z.number().openapi({
+    description: 'Number of chunks created from the document',
+    example: 15
   }),
-  errors: z.array(z.string()).optional().openapi({
-    description: 'Array of error messages if any',
-    example: ['Failed to parse record 123', 'Authentication expired']
+  chunks_updated: z.number().openapi({
+    description: 'Number of existing chunks that were updated',
+    example: 3
   }),
-  created_at: z.string().openapi({
-    description: 'Job creation timestamp',
+  total_tokens: z.number().openapi({
+    description: 'Total token count across all chunks',
+    example: 12500
+  }),
+  updated_at: z.string().openapi({
+    description: 'Last update timestamp from the source document',
     example: '2024-01-15T10:30:00Z'
+  }),
+  message: z.string().optional().openapi({
+    description: 'Additional status message',
+    example: 'Document successfully ingested and chunked'
+  }),
+  error: z.string().optional().openapi({
+    description: 'Error message if status is error',
+    example: 'Document not found in source system'
   })
 }).openapi({
-  description: 'Response schema for upstream ingestion'
+  description: 'Response schema for upstream document ingestion'
 });
 
 export const ErrorResponseSchema = z.object({

@@ -8,6 +8,7 @@ import {
   type IngestUpstreamRequest
 } from './schemas.js';
 import { searchBrave } from './services/web.js';
+import { ingestDocument } from './services/ingestion.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
@@ -92,21 +93,32 @@ fastify.post<{ Body: WebSearchRequest }>('/search/web', async (request, reply) =
 
 fastify.post<{ Body: IngestUpstreamRequest }>('/ingest/upstream', async (request, reply) => {
   try {
-    const { source_url } = request.body;
+    const { source, id, scope } = request.body;
     
-    return {
-      job_id: `ingest_${Date.now()}`,
-      status: 'in_progress' as const,
-      source_url,
-      records_processed: 0,
-      created_at: new Date().toISOString()
-    };
+    // Ingest document from upstream source
+    const result = await ingestDocument({ source, id, scope });
+    
+    // Set appropriate status code based on result
+    if (result.status === 'error') {
+      reply.code(500);
+    } else if (result.status === 'no_change') {
+      reply.code(200); // Not an error, but no work done
+    } else {
+      reply.code(200); // Success
+    }
+    
+    return result;
   } catch (error) {
     reply.code(500);
     return {
-      error: 'Failed to start ingestion',
-      code: 'INGEST_ERROR',
-      details: { message: error instanceof Error ? error.message : 'Unknown error' }
+      source: request.body.source,
+      id: request.body.id,
+      status: 'error' as const,
+      chunks_created: 0,
+      chunks_updated: 0,
+      total_tokens: 0,
+      updated_at: new Date().toISOString(),
+      error: `Ingestion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 });

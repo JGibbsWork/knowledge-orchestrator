@@ -26,9 +26,9 @@ const envSchema = z.object({
   MONGO_URL: z.string().url({
     message: 'MONGO_URL must be a valid MongoDB connection string'
   }),
-  EMBEDDINGS_PROVIDER: z.enum(['openai', 'cohere', 'huggingface', 'local'], {
-    errorMap: () => ({ message: 'EMBEDDINGS_PROVIDER must be one of: openai, cohere, huggingface, local' })
-  }),
+  EMBEDDINGS_PROVIDER: z.enum(['openai', 'ollama', 'cohere', 'huggingface', 'local'], {
+    errorMap: () => ({ message: 'EMBEDDINGS_PROVIDER must be one of: openai, ollama, cohere, huggingface, local' })
+  }).default('ollama'),
   ALLOW_PRIVATE_DEFAULT: z.string()
     .transform((val) => val.toLowerCase() === 'true')
     .pipe(z.boolean())

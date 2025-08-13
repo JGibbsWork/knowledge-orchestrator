@@ -4,41 +4,131 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 extendZodWithOpenApi(z);
 
 export const PackRequestSchema = z.object({
-  content: z.string().min(1).openapi({
-    description: 'Content to be packed',
-    example: 'This is the content to pack'
+  agent_id: z.string().min(1).openapi({
+    description: 'Unique identifier for the agent making the request',
+    example: 'agent_12345'
   }),
-  format: z.enum(['json', 'xml', 'text']).optional().default('json').openapi({
-    description: 'Output format for packed content',
-    example: 'json'
+  task: z.string().min(1).openapi({
+    description: 'Task description or query to process',
+    example: 'Find information about TypeScript best practices'
   }),
-  metadata: z.record(z.string()).optional().openapi({
-    description: 'Additional metadata for the content',
-    example: { source: 'user-input', priority: 'high' }
+  scope: z.array(z.enum(['personal', 'domain', 'web'])).optional().default(['domain']).openapi({
+    description: 'Scopes to search in - personal (Memory), domain (Notion), web (Brave)',
+    example: ['personal', 'domain']
+  }),
+  k: z.number().min(1).max(50).optional().default(10).openapi({
+    description: 'Number of results to return per scope',
+    example: 10
+  }),
+  allow_web: z.boolean().optional().default(false).openapi({
+    description: 'Whether to allow web search (required for web scope)',
+    example: true
+  }),
+  allow_private: z.boolean().optional().openapi({
+    description: 'Whether to allow access to private/personal content',
+    example: false
   })
 }).openapi({
-  description: 'Request schema for packing content'
+  description: 'Request schema for intelligent content packing with query rewrite'
 });
 
 export const PackResponseSchema = z.object({
-  id: z.string().openapi({
-    description: 'Unique identifier for the packed content',
-    example: 'pack_12345'
+  agent_id: z.string().openapi({
+    description: 'Agent ID from the request',
+    example: 'agent_12345'
   }),
-  status: z.enum(['success', 'error']).openapi({
-    description: 'Status of the pack operation',
-    example: 'success'
+  task: z.string().openapi({
+    description: 'Original task from request',
+    example: 'Find information about TypeScript best practices'
   }),
-  packed_content: z.string().openapi({
-    description: 'The packed content',
-    example: 'eyJjb250ZW50IjoiVGhpcyBpcyB0aGUgY29udGVudCB0byBwYWNrIn0='
+  query_variants: z.array(z.string()).openapi({
+    description: 'Generated query variations for improved retrieval',
+    example: ['TypeScript best practices', 'TypeScript coding standards', 'TypeScript development guidelines']
   }),
-  size: z.number().openapi({
-    description: 'Size of the packed content in bytes',
-    example: 1024
+  candidates: z.object({
+    personal: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      snippet: z.string(),
+      score: z.number().optional(),
+      source: z.literal('memory'),
+      vectorScore: z.number().optional(),
+      textScore: z.number().optional(),
+      rrfScore: z.number().optional()
+    })).optional().openapi({
+      description: 'Results from personal/memory scope'
+    }),
+    domain: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      snippet: z.string(),
+      score: z.number().optional(),
+      source: z.literal('notion'),
+      vectorScore: z.number().optional(),
+      textScore: z.number().optional(),
+      rrfScore: z.number().optional()
+    })).optional().openapi({
+      description: 'Results from domain/notion scope'
+    }),
+    web: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      snippet: z.string(),
+      url: z.string(),
+      score: z.number().optional(),
+      source: z.literal('web'),
+      vectorScore: z.number().optional(),
+      textScore: z.number().optional(),
+      rrfScore: z.number().optional()
+    })).optional().openapi({
+      description: 'Results from web scope'
+    })
+  }).openapi({
+    description: 'Retrieved candidates organized by scope'
+  }),
+  context: z.string().optional().openapi({
+    description: 'Compressed summary of all candidates with inline citations',
+    example: '## Key Insights\n\n• TypeScript provides strong typing for JavaScript development [1] [2]\n• Best practices include strict configuration and consistent patterns [3]'
+  }),
+  citations: z.array(z.object({
+    id: z.string(),
+    source: z.object({
+      id: z.string(),
+      source: z.enum(['memory', 'notion', 'web']),
+      url: z.string().optional(),
+      source_id: z.string().optional(),
+      title: z.string()
+    }),
+    snippet: z.string(),
+    used_in_context: z.boolean()
+  })).optional().openapi({
+    description: 'Citations referenced in the context summary'
+  }),
+  debug: z.object({
+    query_generation_ms: z.number(),
+    personal_retrieval_ms: z.number().optional(),
+    domain_retrieval_ms: z.number().optional(),
+    web_retrieval_ms: z.number().optional(),
+    ranking_ms: z.number().optional(),
+    compression_ms: z.number().optional(),
+    total_ms: z.number(),
+    ingested_documents: z.array(z.string()).optional(),
+    compression_stats: z.object({
+      input_chunks: z.number(),
+      input_tokens: z.number(),
+      output_tokens: z.number(),
+      compression_ratio: z.number(),
+      citations_used: z.number()
+    }).optional()
+  }).openapi({
+    description: 'Debug timing information and compression statistics'
+  }),
+  total_candidates: z.number().openapi({
+    description: 'Total number of candidates returned across all scopes',
+    example: 25
   })
 }).openapi({
-  description: 'Response schema for pack operation'
+  description: 'Response schema for intelligent content packing with compression'
 });
 
 export const WebSearchRequestSchema = z.object({

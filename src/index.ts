@@ -9,6 +9,7 @@ import {
 } from './schemas.js';
 import { searchBrave } from './services/web.js';
 import { ingestDocument } from './services/ingestion.js';
+import { pack } from './services/pack.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
@@ -43,22 +44,49 @@ fastify.get('/health', async () => {
 
 fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
   try {
-    const { content, metadata } = request.body;
+    const { agent_id, task, scope, k, allow_web, allow_private } = request.body;
     
-    const packedContent = Buffer.from(JSON.stringify({ content, metadata })).toString('base64');
+    // Validate web scope requirements
+    if (scope?.includes('web') && !allow_web) {
+      reply.code(400);
+      return {
+        agent_id,
+        task,
+        query_variants: [],
+        candidates: {},
+        debug: {
+          query_generation_ms: 0,
+          total_ms: 0
+        },
+        total_candidates: 0,
+        error: 'Web scope requires allow_web=true'
+      };
+    }
     
-    return {
-      id: `pack_${Date.now()}`,
-      status: 'success' as const,
-      packed_content: packedContent,
-      size: packedContent.length
-    };
+    // Execute pack operation
+    const result = await pack({
+      agent_id,
+      task,
+      scope,
+      k,
+      allow_web,
+      allow_private
+    });
+    
+    return result;
   } catch (error) {
     reply.code(500);
     return {
-      error: 'Failed to pack content',
-      code: 'PACK_ERROR',
-      details: { message: error instanceof Error ? error.message : 'Unknown error' }
+      agent_id: request.body.agent_id || 'unknown',
+      task: request.body.task || '',
+      query_variants: [],
+      candidates: {},
+      debug: {
+        query_generation_ms: 0,
+        total_ms: 0
+      },
+      total_candidates: 0,
+      error: `Pack operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 });

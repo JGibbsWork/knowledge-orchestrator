@@ -32,6 +32,12 @@ const envSchema = z.object({
   ALLOW_PRIVATE_DEFAULT: z.string()
     .transform((val) => val.toLowerCase() === 'true')
     .pipe(z.boolean())
+    .default('false'),
+  
+  // Development/testing flags
+  MOCK_NOTION: z.string()
+    .transform((val) => val.toLowerCase() === 'true')
+    .pipe(z.boolean())
     .default('false')
 });
 

@@ -18,6 +18,10 @@ export interface PackRequest {
   k?: number;
   allow_web?: boolean;
   allow_private?: boolean;
+  
+  // F2: Request budgets for circuit breaker integration
+  latency_ms_max?: number;
+  token_budget_max?: number;
 }
 
 export interface Candidate {
@@ -324,11 +328,19 @@ class PackService {
       scope = ['domain'],
       k = 10,
       allow_web = false,
-      allow_private = this.env.ALLOW_PRIVATE_DEFAULT
+      allow_private = this.env.ALLOW_PRIVATE_DEFAULT,
+      // F2: Extract budget parameters
+      latency_ms_max,
+      token_budget_max
     } = request;
 
     console.log(`Starting pack operation for agent ${agent_id} with task: "${task}"`);
     console.log(`Scopes: [${scope.join(', ')}], k=${k}, allow_web=${allow_web}, allow_private=${allow_private}`);
+    
+    // F2: Log budget constraints
+    if (latency_ms_max || token_budget_max) {
+      console.log(`Budget constraints: latency_max=${latency_ms_max}ms, token_max=${token_budget_max}`);
+    }
 
     const debug = {
       query_generation_ms: 0,
@@ -349,11 +361,31 @@ class PackService {
     };
 
     try {
+      // F2: Helper function to check latency budget
+      const checkLatencyBudget = (stepName: string) => {
+        if (latency_ms_max) {
+          const elapsed = Date.now() - overallStartTime;
+          if (elapsed > latency_ms_max * 0.9) { // 90% of budget used
+            console.warn(`⚠️  Approaching latency budget: ${elapsed}/${latency_ms_max}ms at ${stepName}`);
+          }
+          if (elapsed > latency_ms_max) {
+            throw new PackError(
+              `Latency budget exceeded: ${elapsed}ms > ${latency_ms_max}ms at ${stepName}`,
+              undefined,
+              408,
+              'LATENCY_BUDGET_EXCEEDED'
+            );
+          }
+        }
+      };
+
       // Step 1: Generate query variants
       console.log('Step 1: Generating query variants...');
       const queryStartTime = Date.now();
       const queryVariants = await generateQueryVariants(task);
       debug.query_generation_ms = Date.now() - queryStartTime;
+      
+      checkLatencyBudget('query generation');
       
       const allQueries = [queryVariants.original, ...queryVariants.variants];
       console.log(`Generated ${queryVariants.variants.length} variants: [${queryVariants.variants.join(', ')}]`);
@@ -391,6 +423,8 @@ class PackService {
 
       // Wait for all searches to complete
       const results = await Promise.all(retrievalPromises);
+      
+      checkLatencyBudget('parallel retrieval');
       
       // Step 3: Collect all candidates for ranking and filtering
       const allCandidates: RankedItem[] = [];
@@ -448,6 +482,8 @@ class PackService {
       debug.ranking_ms = rankingMs;
       console.log(`Ranking and filtering completed in ${rankingMs}ms`);
 
+      checkLatencyBudget('ranking and filtering');
+
       // Step 5: Compress to summary with citations
       console.log('Step 5: Compressing candidates to summary...');
       const compressionStartTime = Date.now();
@@ -455,13 +491,16 @@ class PackService {
       let compressionResult: CompressionResult | null = null;
       if (rankedCandidates.length > 0) {
         try {
+          // F2: Apply token budget constraint to compression
+          const targetTokens = token_budget_max || 1500;
+          
           compressionResult = await compress(rankedCandidates, {
-            targetTokens: 1500,
+            targetTokens,
             maxCitations: Math.min(20, rankedCandidates.length),
             includeUrls: true
           });
           
-          console.log(`Compression completed: ${compressionResult.debug.compression_stats.input_tokens} → ${compressionResult.debug.token_usage.actual} tokens (${compressionResult.citations.length} citations)`);
+          console.log(`Compression with budget ${targetTokens} tokens completed: ${compressionResult.debug.compression_stats.input_tokens} → ${compressionResult.debug.token_usage.actual} tokens (${compressionResult.citations.length} citations)`);
         } catch (compressionError) {
           console.error('Compression failed:', compressionError);
           // Continue without compression

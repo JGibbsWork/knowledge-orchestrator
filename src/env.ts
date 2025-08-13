@@ -38,7 +38,11 @@ const envSchema = z.object({
   MOCK_NOTION: z.string()
     .transform((val) => val.toLowerCase() === 'true')
     .pipe(z.boolean())
-    .default('false')
+    .default('false'),
+    
+  // KO Client configuration (for moneyBag integration)
+  KO_BASE_URL: z.string().url().optional(),
+  KO_API_KEY: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;

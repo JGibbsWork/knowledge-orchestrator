@@ -27,9 +27,19 @@ export const PackRequestSchema = z.object({
   allow_private: z.boolean().optional().openapi({
     description: 'Whether to allow access to private/personal content',
     example: false
+  }),
+  
+  // F2: Request budgets for circuit breaker integration
+  latency_ms_max: z.number().min(100).max(60000).optional().openapi({
+    description: 'Maximum allowed latency in milliseconds (100ms - 60s)',
+    example: 5000
+  }),
+  token_budget_max: z.number().min(100).max(10000).optional().openapi({
+    description: 'Maximum token budget for response compression (100 - 10000)',
+    example: 1500
   })
 }).openapi({
-  description: 'Request schema for intelligent content packing with query rewrite'
+  description: 'Request schema for intelligent content packing with query rewrite and budget constraints'
 });
 
 export const PackResponseSchema = z.object({

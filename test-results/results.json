@@ -1,0 +1,324 @@
+{
+  "config": {
+    "configFile": "/Users/james/code/gibbsCodesOrg/knowledge-orchestrator/playwright.config.ts",
+    "rootDir": "/Users/james/code/gibbsCodesOrg/knowledge-orchestrator/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ],
+      [
+        "line",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/james/code/gibbsCodesOrg/knowledge-orchestrator/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "api-tests",
+        "name": "api-tests",
+        "testDir": "/Users/james/code/gibbsCodesOrg/knowledge-orchestrator/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/api/pack-final.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.54.2",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm build && MEMORY_BASE_URL=http://localhost:3001 MEMORY_TOKEN=test123 NOTION_BASE_URL=http://localhost:3002 NOTION_TOKEN=secret_test BRAVE_API_KEY=brave123 MONGO_URL=mongodb://localhost:27017/test_e2e EMBEDDINGS_PROVIDER=ollama MOCK_NOTION=true node dist/index.js",
+      "url": "http://localhost:3000/health",
+      "reuseExistingServer": true,
+      "timeout": 120000,
+      "stderr": "pipe",
+      "stdout": "pipe"
+    }
+  },
+  "suites": [
+    {
+      "title": "api/pack-final.spec.ts",
+      "file": "api/pack-final.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "H2: Knowledge Orchestrator E2E API Tests - Final",
+          "file": "api/pack-final.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "H2 ACCEPTANCE CRITERIA: Pack endpoint with domain scope and token validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api-tests",
+                  "projectName": "api-tests",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 27,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "🚀 Running H2 acceptance criteria test...\n"
+                        },
+                        {
+                          "text": "📊 Pack Results Summary: {\n  agent_id: \u001b[32m'h2_final_agent'\u001b[39m,\n  total_candidates: \u001b[33m0\u001b[39m,\n  query_variants_count: \u001b[33m3\u001b[39m,\n  context_length: \u001b[33m0\u001b[39m,\n  citations_count: \u001b[33m0\u001b[39m,\n  debug_total_ms: \u001b[33m9\u001b[39m\n}\n"
+                        },
+                        {
+                          "text": "✅ Basic pack functionality working\n"
+                        },
+                        {
+                          "text": "🎯 H2 CRITICAL CHECK: Token count = 0 (must be < 1600)\n"
+                        },
+                        {
+                          "text": "✅ H2 ACCEPTANCE CRITERIA MET: Tokens < 1.6k\n"
+                        },
+                        {
+                          "text": "ℹ️  No citations generated (acceptable if no candidates found)\n"
+                        },
+                        {
+                          "text": "✅ Processing completed in 9ms\n"
+                        },
+                        {
+                          "text": "\n🎉 H2 CORE ACCEPTANCE CRITERIA VALIDATED!\n"
+                        },
+                        {
+                          "text": "✅ Pack endpoint functional\n"
+                        },
+                        {
+                          "text": "✅ Token budget respected (0 < 1600 tokens)\n"
+                        },
+                        {
+                          "text": "✅ Response structure correct\n"
+                        },
+                        {
+                          "text": "✅ Processing timing recorded\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-14T04:03:14.035Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "81ad2d7c252299cc6558-4023afc51f2eba1cfadb",
+              "file": "api/pack-final.spec.ts",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "H2: Pack endpoint error handling validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api-tests",
+                  "projectName": "api-tests",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "✅ Error handling working correctly\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-14T04:03:14.065Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "81ad2d7c252299cc6558-8ecfda8dc9a95e2f9335",
+              "file": "api/pack-final.spec.ts",
+              "line": 116,
+              "column": 3
+            },
+            {
+              "title": "H2: Token budget constraint enforcement",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api-tests",
+                  "projectName": "api-tests",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "✅ Token budget constraint enforced: 0 tokens (budget: 400)\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-14T04:03:14.072Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "81ad2d7c252299cc6558-9e95ee108de52a35d91f",
+              "file": "api/pack-final.spec.ts",
+              "line": 139,
+              "column": 3
+            },
+            {
+              "title": "H2: Service health and metrics validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api-tests",
+                  "projectName": "api-tests",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "✅ Service health and metrics endpoints working\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-14T04:03:14.079Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "81ad2d7c252299cc6558-48f904594dc897944c16",
+              "file": "api/pack-final.spec.ts",
+              "line": 172,
+              "column": 3
+            },
+            {
+              "title": "H2: Query variant generation validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api-tests",
+                  "projectName": "api-tests",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "✅ Query variant generation: 3 variants created\n"
+                        },
+                        {
+                          "text": "   Variants: [\n  \u001b[32m'how to Machine learning algorithms for natural language processing'\u001b[39m,\n  \u001b[32m'Machine learning algorithms for natural language processing best practices'\u001b[39m,\n  \u001b[32m'Machine learning algorithms for natural language processing tutorial examples'\u001b[39m\n]\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-14T04:03:14.085Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "81ad2d7c252299cc6558-77a68bccd69c11a29bd8",
+              "file": "api/pack-final.spec.ts",
+              "line": 192,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-08-14T04:03:10.344Z",
+    "duration": 3758.426,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

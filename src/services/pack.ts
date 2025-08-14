@@ -8,6 +8,8 @@ import { chunkAndEmbed } from './embeddings.js';
 import { rankAndFilter, type RankedItem } from './ranking.js';
 import { compress, type CompressionResult, type Citation } from './compression.js';
 import { loadEnv } from '../env.js';
+import { createLogger } from '../logger.js';
+import { createMetricsLogger } from './metrics.js';
 
 export type ScopeType = 'personal' | 'domain' | 'web';
 
@@ -81,6 +83,7 @@ export class PackError extends Error {
 
 class PackService {
   private env = loadEnv();
+  private logger = createMetricsLogger(createLogger(this.env));
 
   /**
    * Search personal/memory scope with auto-ingestion
@@ -338,8 +341,21 @@ class PackService {
       token_budget_max
     } = request;
 
-    console.log(`Starting pack operation for agent ${agent_id} with task: "${task}"`);
-    console.log(`Scopes: [${scope.join(', ')}], k=${k}, allow_web=${allow_web}, allow_private=${allow_private}`);
+    // Create scoped logger for this pack operation
+    const requestLogger = this.logger.child({
+      agent_id,
+      task: task.substring(0, 100),
+      scope: scope.join(','),
+      k,
+      allow_web,
+      allow_private,
+      operation: 'pack'
+    });
+
+    requestLogger.info('Starting pack operation', {
+      latency_ms_max,
+      token_budget_max
+    });
     
     // F2: Log budget constraints
     if (latency_ms_max || token_budget_max) {
@@ -384,18 +400,27 @@ class PackService {
       };
 
       // Step 1: Generate query variants
-      console.log('Step 1: Generating query variants...');
+      requestLogger.info('Step 1: Generating query variants');
       const queryStartTime = Date.now();
       const queryVariants = await generateQueryVariants(task);
-      debug.query_generation_ms = Date.now() - queryStartTime;
+      const queryGenMs = Date.now() - queryStartTime;
+      debug.query_generation_ms = queryGenMs;
+      
+      // Record stage metrics
+      requestLogger.recordStage('query_generation', scope.join(','), queryGenMs);
       
       checkLatencyBudget('query generation');
       
       const allQueries = [queryVariants.original, ...queryVariants.variants];
-      console.log(`Generated ${queryVariants.variants.length} variants: [${queryVariants.variants.join(', ')}]`);
+      requestLogger.info('Query variants generated', {
+        variants_count: queryVariants.variants.length,
+        variants: queryVariants.variants,
+        duration_ms: queryGenMs
+      });
 
       // Step 2: Parallel retrieval based on requested scopes
-      console.log('Step 2: Starting parallel retrieval...');
+      requestLogger.info('Step 2: Starting parallel retrieval', { scopes: scope });
+      const retrievalStartTime = Date.now();
       const retrievalPromises: Array<Promise<any>> = [];
       
       // Personal scope
@@ -427,8 +452,17 @@ class PackService {
 
       // Wait for all searches to complete
       const results = await Promise.all(retrievalPromises);
+      const retrievalMs = Date.now() - retrievalStartTime;
       
       checkLatencyBudget('parallel retrieval');
+      
+      // Record retrieval metrics
+      requestLogger.recordStage('parallel_retrieval', scope.join(','), retrievalMs);
+      requestLogger.info('Parallel retrieval completed', {
+        duration_ms: retrievalMs,
+        scopes_completed: results.filter(r => !r.error).length,
+        scopes_failed: results.filter(r => r.error).length
+      });
       
       // Step 3: Collect all candidates for ranking and filtering
       const allCandidates: RankedItem[] = [];
@@ -463,7 +497,9 @@ class PackService {
       }
 
       // Step 4: Apply RRF ranking and diversity filtering
-      console.log('Step 4: Applying RRF ranking and diversity filtering...');
+      requestLogger.info('Step 4: Applying RRF ranking and diversity filtering', {
+        total_candidates: allCandidates.length
+      });
       const rankingStartTime = Date.now();
       
       let rankedCandidates: RankedItem[] = [];
@@ -484,12 +520,22 @@ class PackService {
       
       const rankingMs = Date.now() - rankingStartTime;
       debug.ranking_ms = rankingMs;
-      console.log(`Ranking and filtering completed in ${rankingMs}ms`);
+      
+      // Record ranking metrics
+      requestLogger.recordStage('ranking_and_filtering', scope.join(','), rankingMs);
+      requestLogger.info('Ranking and filtering completed', {
+        duration_ms: rankingMs,
+        ranked_candidates: rankedCandidates.length,
+        input_candidates: allCandidates.length
+      });
 
       checkLatencyBudget('ranking and filtering');
 
       // Step 5: Compress to summary with citations
-      console.log('Step 5: Compressing candidates to summary...');
+      requestLogger.info('Step 5: Compressing candidates to summary', {
+        candidates_to_compress: rankedCandidates.length,
+        token_budget: token_budget_max || 1500
+      });
       const compressionStartTime = Date.now();
       
       let compressionResult: CompressionResult | null = null;
@@ -513,6 +559,20 @@ class PackService {
       
       const compressionMs = Date.now() - compressionStartTime;
       debug.compression_ms = compressionMs;
+      
+      // Record compression metrics
+      requestLogger.recordStage('compression', scope.join(','), compressionMs);
+      if (compressionResult) {
+        requestLogger.info('Compression completed successfully', {
+          duration_ms: compressionMs,
+          input_tokens: compressionResult.debug.compression_stats.input_tokens,
+          output_tokens: compressionResult.debug.compression_stats.output_tokens,
+          compression_ratio: compressionResult.debug.compression_stats.compression_ratio,
+          citations_count: compressionResult.citations.length
+        });
+      } else {
+        requestLogger.info('Compression skipped or failed', { duration_ms: compressionMs });
+      }
 
       // Step 6: Organize final results by scope
       for (const candidate of rankedCandidates) {
@@ -543,7 +603,17 @@ class PackService {
         };
       }
       
-      console.log(`Pack operation completed in ${debug.total_ms}ms with ${totalCandidates} total candidates${compressionResult ? ` and ${compressionResult.citations.length} citations` : ''}`);
+      // Final logging and metrics
+      requestLogger.info('Pack operation completed successfully', {
+        total_duration_ms: debug.total_ms,
+        total_candidates: totalCandidates,
+        citations_count: compressionResult?.citations.length || 0,
+        query_generation_ms: debug.query_generation_ms,
+        retrieval_ms: retrievalMs,
+        ranking_ms: debug.ranking_ms,
+        compression_ms: debug.compression_ms,
+        ingested_documents: debug.ingested_documents?.length || 0
+      });
 
       return {
         agent_id,
@@ -558,7 +628,13 @@ class PackService {
 
     } catch (error) {
       debug.total_ms = Date.now() - overallStartTime;
-      console.error('Pack operation failed:', error);
+      
+      requestLogger.error('Pack operation failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        total_duration_ms: debug.total_ms,
+        agent_id,
+        task: task.substring(0, 100)
+      });
       
       throw new PackError(
         `Pack operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

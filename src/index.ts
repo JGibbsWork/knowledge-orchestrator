@@ -11,13 +11,25 @@ import { searchBrave } from './services/web.js';
 import { ingestDocument } from './services/ingestion.js';
 import { pack } from './services/pack.js';
 import { runConsolidationJob, getConsolidationStats } from './services/ttl.js';
+import { 
+  createMetricsLogger, 
+  createHttpMetricsMiddleware,
+  createHttpMetricsCompleteHook,
+  prometheusRegistry,
+  metrics
+} from './services/metrics.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
+const metricsLogger = createMetricsLogger(logger);
 
 const fastify = Fastify({ 
   logger: logger as any,
 });
+
+// Register HTTP metrics hooks
+fastify.addHook('onRequest', createHttpMetricsMiddleware());
+fastify.addHook('onSend', createHttpMetricsCompleteHook());
 
 fastify.register(import('@fastify/swagger'), {
   openapi: openApiDocument as any,
@@ -43,12 +55,48 @@ fastify.get('/health', async () => {
   return { status: 'ok' };
 });
 
-fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
+// H1: Prometheus metrics endpoint
+fastify.get('/metrics', async (_request, reply) => {
   try {
-    const { agent_id, task, scope, k, allow_web, allow_private } = request.body;
-    
+    const metrics = await prometheusRegistry.metrics();
+    reply.type('text/plain');
+    return metrics;
+  } catch (error) {
+    reply.code(500);
+    return { error: 'Failed to generate metrics' };
+  }
+});
+
+fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
+  const requestStart = Date.now();
+  const { agent_id, task, scope, k, allow_web, allow_private } = request.body;
+  
+  // Create scoped logger for this request
+  const requestLogger = metricsLogger.child({
+    agent_id,
+    task: task.substring(0, 50),
+    scope,
+    request_id: `pack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  });
+
+  requestLogger.info('Pack request started', {
+    k,
+    allow_web,
+    allow_private
+  });
+
+  // Start metrics timer
+  const packTimer = metricsLogger.startTimer(metrics.packRequestDuration, {
+    agent_id,
+    scope: scope?.join(',') || 'unknown'
+  });
+
+  try {
     // Validate web scope requirements
     if (scope?.includes('web') && !allow_web) {
+      requestLogger.warn('Pack request rejected - web scope requires allow_web=true');
+      metricsLogger.recordOutcome('validation_error', scope?.join(',') || 'unknown', agent_id);
+      
       reply.code(400);
       return {
         agent_id,
@@ -64,6 +112,8 @@ fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
       };
     }
     
+    requestLogger.info('Executing pack operation');
+    
     // Execute pack operation
     const result = await pack({
       agent_id,
@@ -74,8 +124,31 @@ fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
       allow_private
     });
     
+    // Record successful completion
+    const totalDuration = Date.now() - requestStart;
+    packTimer.end({ outcome: 'success' });
+    metricsLogger.recordOutcome('success', scope?.join(',') || 'unknown', agent_id);
+    
+    requestLogger.info('Pack request completed successfully', {
+      total_candidates: result.total_candidates,
+      total_duration_ms: totalDuration,
+      query_variants_count: result.query_variants?.length || 0,
+      context_length: result.context?.length || 0,
+      citations_count: result.citations?.length || 0
+    });
+    
     return result;
   } catch (error) {
+    const totalDuration = Date.now() - requestStart;
+    packTimer.end({ outcome: 'error' });
+    metricsLogger.recordOutcome('error', scope?.join(',') || 'unknown', agent_id);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    requestLogger.error('Pack request failed', {
+      error: errorMessage,
+      total_duration_ms: totalDuration
+    });
+    
     reply.code(500);
     return {
       agent_id: request.body.agent_id || 'unknown',
@@ -84,10 +157,10 @@ fastify.post<{ Body: PackRequest }>('/pack', async (request, reply) => {
       candidates: {},
       debug: {
         query_generation_ms: 0,
-        total_ms: 0
+        total_ms: totalDuration
       },
       total_candidates: 0,
-      error: `Pack operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: `Pack operation failed: ${errorMessage}`
     };
   }
 });

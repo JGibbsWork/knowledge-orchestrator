@@ -16,6 +16,9 @@ export interface BaseChunk {
   entities?: string[];     // Named entities extracted from text
   updated_at: Date;        // Last update timestamp
   priority?: ChunkPriority; // Processing/retrieval priority
+  
+  // G1: Privacy tags
+  private?: boolean;       // Whether this chunk contains private/sensitive content
 }
 
 export interface Chunk extends BaseChunk {
@@ -39,6 +42,9 @@ export interface ChunkInsertRequest {
   ephemeral?: boolean;     // Whether to insert into ephemeral collection
   ttlHours?: number;       // TTL in hours for ephemeral chunks (default: 48)
   updated_at?: Date;       // Custom updated_at timestamp (defaults to now)
+  
+  // G1: Privacy tags
+  private?: boolean;       // Whether this chunk contains private/sensitive content
 }
 
 export interface VectorSearchOptions {
@@ -48,6 +54,8 @@ export interface VectorSearchOptions {
     source?: ChunkSource;
     scope?: string;
     priority?: ChunkPriority;
+    // G1: Privacy filtering
+    includePrivate?: boolean; // Whether to include private chunks (default: false)
   };
 }
 
@@ -89,7 +97,7 @@ class ChunkService {
     try {
       this.client = new MongoClient(this.env.MONGO_URL);
       await this.client.connect();
-      this.db = this.client.db();
+      this.db = this.client.db('knowledge_orchestrator');
       
       this.chunksCollection = this.db.collection<Chunk>('chunks');
       this.ephemeralChunksCollection = this.db.collection<EphemeralChunk>('ephemeral_chunks');
@@ -297,7 +305,9 @@ db.ephemeral_chunks.createSearchIndex(${JSON.stringify(ephemeralVectorIndexDefin
       embedding: request.embedding,
       entities: request.entities,
       updated_at: now,
-      priority: request.priority || 'norm'
+      priority: request.priority || 'norm',
+      // G1: Include private flag
+      private: request.private || false
     };
 
     try {
@@ -423,9 +433,21 @@ db.ephemeral_chunks.createSearchIndex(${JSON.stringify(ephemeralVectorIndexDefin
         matchStage.priority = options.filter.priority;
       }
 
+      // G1: Privacy filtering - exclude private chunks unless explicitly allowed
+      if (!options.filter.includePrivate) {
+        matchStage.private = { $ne: true }; // Exclude private chunks by default
+      }
+
       if (Object.keys(matchStage).length > 0) {
         pipeline.push({ $match: matchStage });
       }
+    } else {
+      // G1: Even without other filters, exclude private chunks by default
+      pipeline.push({ 
+        $match: { 
+          private: { $ne: true } 
+        } 
+      });
     }
 
     // Add score projection

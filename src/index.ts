@@ -10,6 +10,7 @@ import {
 import { searchBrave } from './services/web.js';
 import { ingestDocument } from './services/ingestion.js';
 import { pack } from './services/pack.js';
+import { runConsolidationJob, getConsolidationStats } from './services/ttl.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
@@ -147,6 +148,58 @@ fastify.post<{ Body: IngestUpstreamRequest }>('/ingest/upstream', async (request
       total_tokens: 0,
       updated_at: new Date().toISOString(),
       error: `Ingestion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+// G2: TTL consolidation endpoints
+fastify.post('/ttl/consolidate', async (request, reply) => {
+  try {
+    const body = request.body as any;
+    const options = {
+      dryRun: body?.dryRun || false,
+      maxAgeHours: body?.maxAgeHours || 168,  // 7 days default
+      minChunksPerDoc: body?.minChunksPerDoc || 3,
+      maxDigestTokens: body?.maxDigestTokens || 2000,
+      batchSize: body?.batchSize || 100
+    };
+
+    const result = await runConsolidationJob(options);
+    
+    return {
+      success: true,
+      result,
+      message: result.dryRun 
+        ? 'Dry run completed - no changes made'
+        : 'Consolidation job completed successfully'
+    };
+  } catch (error) {
+    reply.code(500);
+    return {
+      success: false,
+      error: 'TTL consolidation failed',
+      code: 'TTL_ERROR',
+      details: { message: error instanceof Error ? error.message : 'Unknown error' }
+    };
+  }
+});
+
+fastify.get('/ttl/stats', async (_request, reply) => {
+  try {
+    const stats = await getConsolidationStats();
+    
+    return {
+      success: true,
+      stats,
+      message: 'TTL consolidation statistics retrieved successfully'
+    };
+  } catch (error) {
+    reply.code(500);
+    return {
+      success: false,
+      error: 'Failed to get TTL stats',
+      code: 'STATS_ERROR',
+      details: { message: error instanceof Error ? error.message : 'Unknown error' }
     };
   }
 });

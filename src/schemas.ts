@@ -282,6 +282,110 @@ export const ErrorResponseSchema = z.object({
   description: 'Error response schema'
 });
 
+// G2: TTL consolidation schemas
+export const TTLConsolidationRequestSchema = z.object({
+  dryRun: z.boolean().optional().default(false).openapi({
+    description: 'If true, only logs what would be done without making changes',
+    example: true
+  }),
+  maxAgeHours: z.number().min(1).max(8760).optional().default(168).openapi({
+    description: 'Maximum age in hours for chunks to be considered old (default: 168 = 7 days)',
+    example: 168
+  }),
+  minChunksPerDoc: z.number().min(2).max(100).optional().default(3).openapi({
+    description: 'Minimum chunks per document to trigger consolidation (default: 3)',
+    example: 3
+  }),
+  maxDigestTokens: z.number().min(500).max(10000).optional().default(2000).openapi({
+    description: 'Maximum tokens for digest chunk (default: 2000)',
+    example: 2000
+  }),
+  batchSize: z.number().min(1).max(1000).optional().default(100).openapi({
+    description: 'Number of documents to process per batch (default: 100)',
+    example: 100
+  })
+}).openapi({
+  description: 'Request schema for TTL consolidation job'
+});
+
+export const TTLConsolidationResponseSchema = z.object({
+  success: z.boolean().openapi({
+    description: 'Whether the consolidation job succeeded',
+    example: true
+  }),
+  result: z.object({
+    documentsProcessed: z.number().openapi({
+      description: 'Number of documents processed',
+      example: 25
+    }),
+    chunksConsolidated: z.number().openapi({
+      description: 'Number of individual chunks consolidated',
+      example: 150
+    }),
+    digestsCreated: z.number().openapi({
+      description: 'Number of digest chunks created',
+      example: 25
+    }),
+    tokensReclaimed: z.number().openapi({
+      description: 'Number of tokens reclaimed through consolidation',
+      example: 8500
+    }),
+    errors: z.array(z.string()).openapi({
+      description: 'List of errors encountered during processing',
+      example: []
+    }),
+    dryRun: z.boolean().openapi({
+      description: 'Whether this was a dry run',
+      example: true
+    }),
+    duration: z.number().openapi({
+      description: 'Job duration in milliseconds',
+      example: 45000
+    })
+  }).openapi({
+    description: 'Consolidation job results'
+  }),
+  message: z.string().openapi({
+    description: 'Human-readable result message',
+    example: 'Dry run completed - no changes made'
+  })
+}).openapi({
+  description: 'Response schema for TTL consolidation job'
+});
+
+export const TTLStatsResponseSchema = z.object({
+  success: z.boolean().openapi({
+    description: 'Whether the stats request succeeded',
+    example: true
+  }),
+  stats: z.object({
+    candidateDocuments: z.number().openapi({
+      description: 'Number of documents eligible for consolidation',
+      example: 42
+    }),
+    candidateChunks: z.number().openapi({
+      description: 'Number of chunks that could be consolidated',
+      example: 287
+    }),
+    totalCandidateTokens: z.number().openapi({
+      description: 'Total tokens in consolidatable chunks',
+      example: 45600
+    }),
+    estimatedReclamation: z.number().openapi({
+      description: 'Estimated tokens that could be reclaimed',
+      example: 22800
+    })
+  }).openapi({
+    description: 'TTL consolidation statistics'
+  }),
+  message: z.string().openapi({
+    description: 'Human-readable result message',
+    example: 'TTL consolidation statistics retrieved successfully'
+  })
+}).openapi({
+  description: 'Response schema for TTL consolidation statistics'
+});
+
 export type PackRequest = z.infer<typeof PackRequestSchema>;
 export type PackResponse = z.infer<typeof PackResponseSchema>;
 export type WebSearchRequest = z.infer<typeof WebSearchRequestSchema>;
@@ -289,3 +393,8 @@ export type WebSearchResponse = z.infer<typeof WebSearchResponseSchema>;
 export type IngestUpstreamRequest = z.infer<typeof IngestUpstreamRequestSchema>;
 export type IngestUpstreamResponse = z.infer<typeof IngestUpstreamResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+
+// G2: TTL consolidation types
+export type TTLConsolidationRequest = z.infer<typeof TTLConsolidationRequestSchema>;
+export type TTLConsolidationResponse = z.infer<typeof TTLConsolidationResponseSchema>;
+export type TTLStatsResponse = z.infer<typeof TTLStatsResponseSchema>;

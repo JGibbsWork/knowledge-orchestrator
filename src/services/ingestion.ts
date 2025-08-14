@@ -266,6 +266,9 @@ class IngestionService {
         totalTokens += chunk.tokens;
 
         try {
+          // G1: Determine if chunk contains private content
+          const isPrivate = this.isContentPrivate(chunk.text, source, scope);
+          
           const chunkId = await insertChunk({
             source,
             source_id: id,
@@ -275,7 +278,8 @@ class IngestionService {
             tokens: chunk.tokens,
             embedding: chunk.embedding,
             priority: 'norm',
-            updated_at: new Date(document.updated_at)
+            updated_at: new Date(document.updated_at),
+            private: isPrivate
           });
 
           insertedChunkIds.push(chunkId);
@@ -363,6 +367,69 @@ class IngestionService {
     }
 
     return results;
+  }
+
+  /**
+   * G1: Determine if content should be marked as private
+   * This is a simple heuristic-based approach that can be enhanced
+   */
+  private isContentPrivate(text: string, source: ChunkSource, scope: string): boolean {
+    // Basic privacy detection heuristics
+    const privateIndicators = [
+      // Personal identifiers
+      /\b\d{3}-\d{2}-\d{4}\b/,           // SSN pattern
+      /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, // Email addresses
+      /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/, // Credit card pattern
+      /\bphone:\s*[\d\s\-\(\)]+/i,       // Phone numbers
+      /\bmobile:\s*[\d\s\-\(\)]+/i,      // Mobile numbers
+      
+      // Financial information
+      /\$[\d,]+\.\d{2}/,                 // Dollar amounts
+      /\b(salary|wage|income|profit|revenue|budget):\s*\$?[\d,]+/i,
+      /\b(account|routing)\s*number/i,
+      
+      // Sensitive business information
+      /\b(confidential|proprietary|internal only|classified|restricted)/i,
+      /\b(api key|secret|password|token|credentials)/i,
+      /\b(customer data|user data|personal information)/i,
+      /\bnda\b|\bnon.disclosure/i,       // Non-disclosure agreements
+      
+      // Private company information
+      /\b(board meeting|executive|c-level|ceo|cto|cfo)/i,
+      /\b(acquisition|merger|layoffs|reorganization)/i,
+      /\b(performance review|hr matter|personnel)/i
+    ];
+
+    // Check if text contains any private indicators
+    const hasPrivateContent = privateIndicators.some(pattern => pattern.test(text));
+    
+    // Scope-based privacy rules
+    const privateScopePatterns = [
+      /^private_/,                       // Scopes starting with 'private_'
+      /^personal_/,                      // Scopes starting with 'personal_'  
+      /^confidential_/,                  // Scopes starting with 'confidential_'
+      /^internal_/,                      // Scopes starting with 'internal_'
+      /hr|human.resources/i,             // HR-related scopes
+      /finance|accounting|payroll/i,     // Financial scopes
+      /executive|board|management/i      // Executive scopes
+    ];
+    
+    const hasPrivateScope = privateScopePatterns.some(pattern => pattern.test(scope));
+    
+    // Source-specific rules
+    let sourceBasedPrivacy = false;
+    if (source === 'memory') {
+      // Memory content is often personal/private by default
+      sourceBasedPrivacy = true;
+    }
+    
+    const isPrivate = hasPrivateContent || hasPrivateScope || sourceBasedPrivacy;
+    
+    if (isPrivate) {
+      console.log(`🔒 Content marked as private (source: ${source}, scope: ${scope}, indicators: ${hasPrivateContent})`);
+    }
+    
+    return isPrivate;
   }
 }
 

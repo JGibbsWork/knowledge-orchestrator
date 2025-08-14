@@ -275,6 +275,9 @@ class PackService {
                 const chunks = await chunkAndEmbed(result.fullText);
                 
                 for (const chunk of chunks.slice(0, 3)) { // Limit chunks per URL
+                  // G1: Web content is generally public, but mark private if it contains sensitive info
+                  const isPrivate = this.isWebContentPrivate(chunk.text, result.url);
+                  
                   await insertChunk({
                     source: 'web',
                     url: result.url,
@@ -283,7 +286,8 @@ class PackService {
                     tokens: chunk.tokens,
                     embedding: chunk.embedding,
                     ephemeral: true,
-                    ttlHours: 2 // Short TTL for web content
+                    ttlHours: 2, // Short TTL for web content
+                    private: isPrivate
                   });
                 }
                 
@@ -563,6 +567,45 @@ class PackService {
         'PACK_ERROR'
       );
     }
+  }
+
+  /**
+   * G1: Simple privacy detection for web content
+   */
+  private isWebContentPrivate(text: string, url: string): boolean {
+    // Check for sensitive patterns in web content
+    const sensitivePatterns = [
+      /\b(login|password|auth|credential|token)/i,
+      /\b(private|confidential|restricted|internal)/i,
+      /\b\w+@\w+\.\w+/,                    // Email addresses
+      /\b\d{3}-\d{2}-\d{4}\b/,            // SSN pattern
+      /\b(api key|secret|private key)/i
+    ];
+
+    const hasPrivateContent = sensitivePatterns.some(pattern => pattern.test(text));
+    
+    // Check URL patterns that might indicate private content
+    const privateUrlPatterns = [
+      /\/admin\//,
+      /\/private\//,
+      /\/internal\//,
+      /\/dashboard\//,
+      /\.local$/,
+      /localhost/,
+      /127\.0\.0\.1/,
+      /192\.168\./,
+      /10\.\d+\./
+    ];
+    
+    const hasPrivateUrl = privateUrlPatterns.some(pattern => pattern.test(url));
+    
+    const isPrivate = hasPrivateContent || hasPrivateUrl;
+    
+    if (isPrivate) {
+      console.log(`🔒 Web content marked as private: ${url}`);
+    }
+    
+    return isPrivate;
   }
 }
 
